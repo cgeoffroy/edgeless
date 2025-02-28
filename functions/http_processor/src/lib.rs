@@ -8,13 +8,16 @@ struct ProcesorFun;
 
 impl EdgeFunction for ProcesorFun {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
-        log::info!("HTTP_Processor: 'Cast' called, MSG: {:?}", encoded_message);
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+        log::info!("HTTP_Processor: 'Cast' called, MSG: {}", str_message);
     }
 
     fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
         log::info!("HTTP_Processor: 'Call' called, MSG: {}", str_message);
         let req: EdgelessHTTPRequest = edgeless_http::request_from_string(str_message).unwrap();
+
+        cast("self", format!("encoded_message:{}", str_message).as_bytes());
 
         let resp = if req.path == "/hello" {
             EdgelessHTTPResponse {
@@ -34,6 +37,7 @@ impl EdgeFunction for ProcesorFun {
     }
 
     fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
+        edgeless_function::init_logger();
         log::info!("HTTP_Processor: 'Init' called");
     }
 

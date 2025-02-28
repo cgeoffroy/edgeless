@@ -12,6 +12,11 @@ pub enum EventData {
     Err,
 }
 
+// #[derive(Clone, Debug, PartialEq, Eq)]
+// pub struct EventMetadata {
+//     pub root: u64,
+// }
+
 impl std::fmt::Display for EventData {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -29,6 +34,7 @@ pub struct Event {
     pub target: crate::function_instance::InstanceId,
     pub source: crate::function_instance::InstanceId,
     pub stream_id: u64,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub data: EventData,
     pub created: crate::function_instance::EventTimestamp,
 }

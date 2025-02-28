@@ -19,6 +19,7 @@ impl COAPEncoder {
             target: event.target,
             source: event.source,
             stream_id: event.stream_id,
+            metadata: event.metadata.clone(),
             data: match event.data {
                 crate::invocation::EventData::Cast(val) => crate::invocation::EventData::Cast(val.into()),
                 crate::invocation::EventData::Call(val) => crate::invocation::EventData::Call(val.into()),
@@ -249,6 +250,7 @@ impl CoapDecoder {
                     target: event.target,
                     source: event.source,
                     stream_id: event.stream_id,
+                    metadata: event.metadata.clone(),
                     data: match event.data {
                         crate::invocation::EventData::Cast(val) => crate::invocation::EventData::Cast(val),
                         crate::invocation::EventData::Call(val) => crate::invocation::EventData::Call(val),

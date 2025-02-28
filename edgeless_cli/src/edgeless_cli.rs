@@ -341,6 +341,7 @@ async fn main() -> anyhow::Result<()> {
                         },
                         source: edgeless_api::function_instance::InstanceId::none(),
                         stream_id: 0,
+                        metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 424242 }),
                         data: match event_type.as_str() {
                             "cast" => edgeless_api::invocation::EventData::Cast(payload),
                             _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),

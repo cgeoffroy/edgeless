@@ -20,6 +20,7 @@ impl EmbeddedDataplaneHandle {
             target,
             source: slf,
             stream_id: 0,
+            metadata: None,
             data: edgeless_api_core::invocation::EventData::Cast(msg.as_bytes()),
             created: edgeless_api_core::event_timestamp::EventTimestamp::default(),
         };

@@ -303,7 +303,7 @@ async fn is_telemetry_event_invocation_complete(receiver: &mut TelemetryReceiver
 #[tokio::test]
 async fn messaging_cast_raw_input() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
-    test_peer_handle.send(instance_id, "some_message".to_string()).await;
+    test_peer_handle.send(instance_id, None, "some_message".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -318,7 +318,7 @@ async fn messaging_cast_raw_input() {
 async fn messaging_cast_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_cast_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -338,7 +338,7 @@ async fn messaging_cast_raw_output() {
 async fn messaging_call_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_call_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_call_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -354,7 +354,7 @@ async fn messaging_call_raw_output() {
     );
 
     test_peer_handle
-        .reply(test_message.source_id, test_message.channel_id, CallRet::NoReply)
+        .reply(test_message.source_id, test_message.channel_id, None, CallRet::NoReply)
         .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -368,7 +368,7 @@ async fn messaging_delayed_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_delayed_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_delayed_cast_output".to_string()).await;
     let start = tokio::time::Instant::now();
 
     let test_message = next_handle.receive_next().await;
@@ -393,7 +393,7 @@ async fn messaging_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_cast_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -411,7 +411,7 @@ async fn messaging_call_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_call_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -423,7 +423,9 @@ async fn messaging_call_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(test_message.message, edgeless_dataplane::core::Message::Call("call_output".to_string()));
 
-    next_handle.reply(test_message.source_id, test_message.channel_id, CallRet::NoReply).await;
+    next_handle
+        .reply(test_message.source_id, test_message.channel_id, None, CallRet::NoReply)
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
@@ -436,7 +438,7 @@ async fn function_in_call_can_be_stopped() {
     let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_call_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -461,7 +463,7 @@ async fn function_in_call_can_be_stopped() {
 async fn messaging_call_raw_input_noreply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id, "some_cast".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, None, "some_cast".to_string()).await;
     assert_eq!(ret, CallRet::NoReply);
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -474,7 +476,7 @@ async fn messaging_call_raw_input_noreply() {
 async fn messaging_call_raw_input_reply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id, "test_ret".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, None, "test_ret".to_string()).await;
     assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -487,7 +489,7 @@ async fn messaging_call_raw_input_reply() {
 async fn messaging_call_raw_input_err() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id, "test_err".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, None, "test_err".to_string()).await;
     assert_eq!(ret, CallRet::Err);
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -569,7 +571,7 @@ async fn state_management() {
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     // trigger sync
-    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, None, "test_cast_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let (state_set_id, state_set_value) = state_mock_receiver.try_next().unwrap().unwrap();

@@ -17,6 +17,7 @@ impl DataPlaneLink for RemoteLink {
     async fn handle_send(
         &mut self,
         target: &edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
         created: &edgeless_api::function_instance::EventTimestamp,
@@ -30,6 +31,14 @@ impl DataPlaneLink for RemoteLink {
                 target: *target,
                 source: *src,
                 stream_id,
+                metadata: metadata.cloned(),
+                // metadata: match msg {
+                //     Message::Call(metadata, _) => metadata.clone(),
+                //     Message::Cast(metadata, _) => metadata.clone(),
+                //     Message::CallRet(metadata, _) => metadata.clone(),
+                //     Message::CallNoRet(metadata) => metadata.clone(),
+                //     Message::Err(metadata) => metadata.clone(),
+                // },
                 data: match msg {
                     Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
                     Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
@@ -158,6 +167,7 @@ mod test {
             target: fid_wrong_component_id,
             source: fid_source,
             stream_id: 0,
+            metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
         })
@@ -171,6 +181,7 @@ mod test {
                 target: fid_wrong_node_id,
                 source: fid_source,
                 stream_id: 0,
+                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
                 created: created.clone(),
             })
@@ -183,6 +194,7 @@ mod test {
             target: fid_target,
             source: fid_source,
             stream_id: 0,
+            metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
         })
@@ -224,6 +236,8 @@ mod test {
             function_id: fid_target.function_id,
         };
 
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+
         let (api_sender_node_2, mut api_receiver_node_2) = futures::channel::mpsc::unbounded::<edgeless_api::invocation::Event>();
         let node_2_api: Box<dyn edgeless_api::invocation::InvocationAPI> = Box::new(MockInvocationAPI {
             own_node_id: node_id_2,
@@ -238,25 +252,39 @@ mod test {
         let mut link = provider.new_link(fid_source, sender_1).await;
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(&fid_target, Some(&mdata_1), Message::Cast("Test".to_string()), &fid_source, &created, 0)
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
 
         let res = link
-            .handle_send(&fid_wrong_component_id, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(
+                &fid_wrong_component_id,
+                Some(&mdata_1),
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
 
         let res = link
-            .handle_send(&fid_wrong_node_id, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(
+                &fid_wrong_node_id,
+                Some(&mdata_1),
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::PASSED);
         assert!(api_receiver_node_2.try_next().is_err());
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(&fid_target, Some(&mdata_1), Message::Cast("Test".to_string()), &fid_source, &created, 0)
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());

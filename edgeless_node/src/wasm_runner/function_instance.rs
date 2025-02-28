@@ -7,6 +7,7 @@ use wasmtime::AsContextMut;
 /// FunctionInstance implementation allowing to execute functions defined as WASM components.
 /// Note that this only contains the WASM specific bindings, while the base_runtime provides the generic runtime functionality.
 pub struct WASMFunctionInstance {
+    metadata_i32_const_ptr: wasmtime::Global,
     edgeless_mem_alloc: wasmtime::TypedFunc<i32, i32>,
     edgeless_mem_free: wasmtime::TypedFunc<(i32, i32), ()>,
     edgeless_mem_clear: wasmtime::TypedFunc<(), ()>,
@@ -159,7 +160,16 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             .await
             .expect("could not instantiate async linker");
 
+        // Create a pointer in the store
+        let ty = wasmtime::GlobalType::new(wasmtime::ValType::I32, wasmtime::Mutability::Var);
+        let metadata_i32_const_ptr = wasmtime::Global::new(&mut store, ty, 1i32.into()).unwrap();
+        // Set the pointer to 1
+        metadata_i32_const_ptr
+            .set(&mut store, wasmtime::Val::I32(1i32))
+            .expect("could not set store pointer");
+
         Ok(Box::new(Self {
+            metadata_i32_const_ptr: metadata_i32_const_ptr,
             edgeless_mem_alloc: instance
                 .get_typed_func::<i32, i32>(&mut store, "edgeless_mem_alloc")
                 .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("edgeless_mem_alloc not available: {}", e)))?,
@@ -244,13 +254,27 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         ret
     }
 
-    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), crate::base_runtime::FunctionInstanceError> {
+    async fn cast(
+        &mut self,
+        src: &edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: &str,
+    ) -> Result<(), crate::base_runtime::FunctionInstanceError> {
+        log::info!("Cast {:?} {:?}", metadata, msg);
         // Depending on the Function, we might employ a basic arena/bump allocator that we must reset at the end of a transaction.
         // This might be a noop if the function defines a working version of `edgeless_mem_free`.
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: mem_clear {}", e)))?;
+
+        let _ = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, &[0x42]); // TODO to seriliaz
+        self.memory.write(self.store.as_context_mut(), 0, &[12u8]);
+        self.metadata_i32_const_ptr.set(&mut self.store, wasmtime::Val::I32(1i32));
+
+        let _ = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, &[0x42]); // TODO to seriliaz
+        self.memory.write(self.store.as_context_mut(), 0, &[12u8]);
+        self.metadata_i32_const_ptr.set(&mut self.store, wasmtime::Val::I32(1i32));
 
         let component_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
@@ -260,6 +284,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         )
         .await
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm1 {}", e)))?;
+        log::error!("Copied to vm at {:?}", component_id_ptr);
+
         let node_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
             &self.memory,
@@ -302,8 +328,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     async fn call(
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
+        log::info!("Call {:?} {:?}", metadata, msg);
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await

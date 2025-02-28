@@ -17,6 +17,10 @@ impl InvocationConverters {
             target: CommonConverters::parse_instance_id(api_event.target.as_ref().unwrap())?,
             source: CommonConverters::parse_instance_id(api_event.source.as_ref().unwrap())?,
             stream_id: api_event.stream_id,
+            metadata: api_event
+                .metadata
+                .as_ref()
+                .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
             data: Self::parse_api_event_data(api_event.msg.as_ref().unwrap())?,
             created: CommonConverters::parse_event_timestamp(api_event.created.as_ref().unwrap())?,
         })
@@ -37,6 +41,7 @@ impl InvocationConverters {
             target: Some(CommonConverters::serialize_instance_id(&crate_event.target)),
             source: Some(CommonConverters::serialize_instance_id(&crate_event.source)),
             stream_id: crate_event.stream_id,
+            metadata: crate_event.metadata.as_ref().map(|x| super::api::EventMetadata { root: x.root }),
             msg: Some(Self::encode_crate_event_data(&crate_event.data)),
             created: Some(CommonConverters::serialize_event_timestamp(&crate_event.created)),
         }

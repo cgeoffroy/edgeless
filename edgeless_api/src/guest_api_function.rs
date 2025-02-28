@@ -16,6 +16,7 @@ pub struct FunctionInstanceInit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputEventData {
     pub src: edgeless_api_core::instance_id::InstanceId,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub msg: Vec<u8>,
 }
 

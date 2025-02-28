@@ -46,6 +46,7 @@ impl SqlxResource {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
+                    metadata: _,
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
@@ -98,6 +99,7 @@ impl SqlxResource {
                                     .reply(
                                         source_id,
                                         channel_id,
+                                        None,
                                         edgeless_dataplane::core::CallRet::Reply(serde_json::to_string(&response).unwrap_or_default()),
                                     )
                                     .await;
@@ -106,7 +108,7 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Response from database: {:?}", e.to_string());
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
                                 .await;
                         }
                     }
@@ -125,7 +127,7 @@ impl SqlxResource {
                                     response.last_insert_rowid()
                                 );
                                 dataplane_handle
-                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res))
+                                    .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Reply(res))
                                     .await;
                             }
                         }
@@ -133,14 +135,14 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Error from state management: {:?}", e);
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
                                 .await;
                         }
                     }
                 } else {
                     log::info!("Unknow operation in state management");
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                        .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Err)
                         .await;
                 };
 

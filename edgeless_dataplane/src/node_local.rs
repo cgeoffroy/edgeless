@@ -18,6 +18,7 @@ impl DataPlaneLink for NodeLocalLink {
     async fn handle_send(
         &mut self,
         target: &edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
         created: &edgeless_api::function_instance::EventTimestamp,
@@ -32,6 +33,7 @@ impl DataPlaneLink for NodeLocalLink {
                     target: *target,
                     source: *src,
                     stream_id,
+                    metadata: metadata.cloned(),
                     data: match msg {
                         Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
                         Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
@@ -69,6 +71,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                 .send(DataplaneEvent {
                     source_id: event.source,
                     channel_id: event.stream_id,
+                    metadata: event.metadata.clone(),
                     message: msg,
                     created: event.created,
                 })
@@ -136,13 +139,15 @@ mod test {
         let mut handle_1 = provider.new_link(fid_1, sender_1).await;
 
         let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
-        let _handle_2 = provider.new_link(fid_2, sender_2).await;
+        let _handle_2 = provider.new_link(fid_2.clone(), sender_2).await;
+
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 4242 };
 
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());
 
         let ret_1 = handle_1
-            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
+            .handle_send(&fid_3, Some(&mdata_1), crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
             .as_mut()
             .await;
 
@@ -151,7 +156,7 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
-            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
+            .handle_send(&fid_2, Some(&mdata_1), crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
             .as_mut()
             .await;
 

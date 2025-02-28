@@ -45,11 +45,12 @@ pub async fn cast_raw(
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
 
     caller
         .data_mut()
         .host
-        .cast_raw(instance_id, &payload)
+        .cast_raw(instance_id, Some(&this_metadata), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("string error"))?;
     Ok(())
@@ -73,11 +74,12 @@ pub async fn call_raw(
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
 
     let call_ret = caller
         .data_mut()
         .host
-        .call_raw(instance_id, &payload)
+        .call_raw(instance_id, Some(&this_metadata), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     match call_ret {
@@ -102,12 +104,14 @@ pub async fn cast(
     payload_ptr: i32,
     payload_len: i32,
 ) -> wasmtime::Result<()> {
-    let mem = get_memory(&mut caller)?;
+    let mem = get_memory(&mut caller)?; // HERE
 
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
-    match caller.data_mut().host.cast_alias(&target, &payload).await {
+    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+
+    match caller.data_mut().host.cast_alias(&target, Some(&this_metadata), &payload).await {
         Ok(_) => {}
         Err(_) => {
             // We ignore casts to unknown targets.
@@ -133,10 +137,13 @@ pub async fn call(
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
+    log::info!("Call {} {}", target, payload);
+    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+
     let call_ret = caller
         .data_mut()
         .host
-        .call_alias(&target, &payload)
+        .call_alias(&target, Some(&this_metadata), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     match call_ret {
@@ -166,10 +173,12 @@ pub async fn delayed_cast(
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
+    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+
     caller
         .data_mut()
         .host
-        .delayed_cast(delay_ms as u64, &target, &payload)
+        .delayed_cast(delay_ms as u64, &target, Some(&this_metadata), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     Ok(())

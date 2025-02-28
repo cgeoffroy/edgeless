@@ -15,6 +15,12 @@ pub enum EventData<T> {
     Err,
 }
 
+#[derive(Clone, Debug, PartialEq, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
+pub struct EventMetadata {
+    #[n(0)]
+    pub root: u64,
+}
+
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
 pub struct Event<T> {
     #[n(0)]
@@ -24,6 +30,8 @@ pub struct Event<T> {
     #[n(2)]
     pub stream_id: u64,
     #[n(3)]
+    pub metadata: Option<EventMetadata>,
+    #[n(34)]
     pub data: EventData<T>,
     #[n(4)]
     pub created: crate::event_timestamp::EventTimestamp,

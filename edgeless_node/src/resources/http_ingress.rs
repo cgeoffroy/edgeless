@@ -59,6 +59,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
     fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
         let cloned = self.interests.clone();
         let cloned_addr = self.listen_addr.clone();
+        log::info!("Call into http_ingress {:?}", req.headers());
         Box::pin(async move {
             let mut lck = cloned.lock().await;
 
@@ -97,7 +98,8 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let res = lck.dataplane.call(target, serialized_msg).await;
+                let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+                let res = lck.dataplane.call(target, Some(&this_metadata), serialized_msg).await;
                 if let edgeless_dataplane::core::CallRet::Reply(data) = res {
                     let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
                     let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
@@ -133,6 +135,7 @@ pub async fn ingress_task(
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
     let mut provider = dataplane_provider;
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
+
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
     let dataplane = provider.get_handle_for(ingress_id).await;
@@ -142,7 +145,11 @@ pub async fn ingress_task(
         active_resources: std::collections::HashMap::new(),
         dataplane,
     }));
-
+    log::error!(
+        "*************************** Parsed the ingress url with v2, host={:?}, port={:?} *****************",
+        host,
+        port
+    );
     let cloned_interests = ingress_state.clone();
 
     let _web_task: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {

@@ -151,6 +151,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                     target: event.target,
                     source: event.source,
                     stream_id: event.stream_id,
+                    metadata: None,
                     data: match event.data {
                         edgeless_api_core::invocation::EventData::Cast(val) => {
                             edgeless_api_core::invocation::EventData::Cast(heapless::Vec::<u8, 1500>::from_slice(val).unwrap())

@@ -73,6 +73,7 @@ impl FileLogResource {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
+                    metadata: _,
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
@@ -109,7 +110,7 @@ impl FileLogResource {
                 // Reply to the caller if the resource instance was called.
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                        .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
 

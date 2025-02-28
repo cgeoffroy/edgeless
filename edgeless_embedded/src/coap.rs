@@ -314,6 +314,7 @@ impl CoapMultiplexer {
                 target: event.target,
                 source: event.source,
                 stream_id: event.stream_id,
+                metadata: None,
                 data: match &event.data {
                     edgeless_api_core::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val),
                     edgeless_api_core::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val),

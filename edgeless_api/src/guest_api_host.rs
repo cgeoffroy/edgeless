@@ -5,6 +5,7 @@
 pub struct OutputEventData {
     pub originator: edgeless_api_core::instance_id::InstanceId,
     pub alias: String,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub msg: Vec<u8>,
 }
 
@@ -12,6 +13,7 @@ pub struct OutputEventData {
 pub struct OutputEventDataRaw {
     pub originator: edgeless_api_core::instance_id::InstanceId,
     pub dst: edgeless_api_core::instance_id::InstanceId,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub msg: Vec<u8>,
 }
 
@@ -36,6 +38,7 @@ pub struct TelemetryLogEvent {
 pub struct DelayedEventData {
     pub originator: edgeless_api_core::instance_id::InstanceId,
     pub alias: String,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub msg: Vec<u8>,
     pub delay: u64,
 }

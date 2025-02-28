@@ -47,6 +47,7 @@ impl DataplaneHandle {
                 if let Some(DataplaneEvent {
                     source_id,
                     channel_id,
+                    metadata,
                     message,
                     created,
                 }) = receiver.next().await
@@ -65,6 +66,7 @@ impl DataplaneHandle {
                         .send(DataplaneEvent {
                             source_id,
                             channel_id,
+                            metadata,
                             message,
                             created,
                         })
@@ -95,6 +97,7 @@ impl DataplaneHandle {
             if let Some(DataplaneEvent {
                 source_id,
                 channel_id,
+                metadata,
                 message,
                 created,
             }) = self.receiver.lock().await.next().await
@@ -105,6 +108,7 @@ impl DataplaneHandle {
                     return DataplaneEvent {
                         source_id,
                         channel_id,
+                        metadata,
                         message,
                         created,
                     };
@@ -115,19 +119,29 @@ impl DataplaneHandle {
     }
 
     /// Send a `cast` event.
-    pub async fn send(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) {
-        self.send_inner(target, Message::Cast(msg), timestamp_utc(), 0).await;
+    pub async fn send(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: String,
+    ) {
+        self.send_inner(target, Message::Cast(msg), timestamp_utc(), 0, metadata).await;
     }
 
     // Send a `call` event and wait for the return event.
     // Internally, this sets up a receiver override to handle the message before it would be sent to the `receive_next` function.
-    pub async fn call(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> CallRet {
+    pub async fn call(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: String,
+    ) -> CallRet {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id).await;
+        self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id, metadata).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -139,7 +153,13 @@ impl DataplaneHandle {
     }
 
     // Reply to a `call` event using the `channel_id` used to send the request.
-    pub async fn reply(&mut self, target: edgeless_api::function_instance::InstanceId, channel_id: u64, msg: CallRet) {
+    pub async fn reply(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        channel_id: u64,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: CallRet,
+    ) {
         self.send_inner(
             target,
             match msg {
@@ -149,6 +169,7 @@ impl DataplaneHandle {
             },
             edgeless_api::function_instance::EventTimestamp::default(),
             channel_id,
+            metadata,
         )
         .await;
     }
@@ -159,10 +180,11 @@ impl DataplaneHandle {
         msg: Message,
         created: edgeless_api::function_instance::EventTimestamp,
         channel_id: u64,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
     ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id).await == LinkProcessingResult::FINAL {
+            if link.handle_send(&target, metadata, msg.clone(), &self.slf, &created, channel_id).await == LinkProcessingResult::FINAL {
                 return;
             }
         }
@@ -254,10 +276,12 @@ mod test {
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), None).await;
 
-        let mut handle_1 = provider.get_handle_for(fid_1).await;
-        let mut handle_2 = provider.get_handle_for(fid_2).await;
+        let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        handle_1.send(fid_2, "Test".to_string()).await;
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+
+        handle_1.send(fid_2, Some(&mdata_1), "Test".to_string()).await;
 
         let res = handle_2.receive_next().await;
         assert_eq!(
@@ -274,10 +298,13 @@ mod test {
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), None).await;
 
-        let mut handle_1 = provider.get_handle_for(fid_1).await;
-        let mut handle_2 = provider.get_handle_for(fid_2).await;
+        let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        let return_handle = tokio::spawn(async move { handle_1.call(fid_2, "Test".to_string()).await });
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+        let mdata_2 = mdata_1.clone();
+
+        let return_handle = tokio::spawn(async move { handle_1.call(fid_2, Some(&mdata_2), "Test".to_string()).await });
 
         let req = handle_2.receive_next().await;
         assert_eq!(
@@ -285,7 +312,7 @@ mod test {
             std::mem::discriminant(&crate::core::Message::Call("".to_string()))
         );
 
-        handle_2.reply(req.source_id, req.channel_id, CallRet::NoReply).await;
+        handle_2.reply(req.source_id, req.channel_id, Some(&mdata_1), CallRet::NoReply).await;
 
         let repl = return_handle.await.unwrap();
         assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));
@@ -329,10 +356,13 @@ mod test {
         let mut provider_1 = provider_1_r.unwrap().unwrap();
         let mut provider_2 = provider_2_r.unwrap().unwrap();
 
-        let mut handle_1 = provider_1.get_handle_for(fid_1).await;
-        let mut handle_2 = provider_2.get_handle_for(fid_2).await;
+        let mut handle_1 = provider_1.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider_2.get_handle_for(fid_2.clone()).await;
 
-        handle_1.send(fid_2, "Test".to_string()).await;
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+        let mdata_2 = mdata_1.clone();
+
+        handle_1.send(fid_2.clone(), Some(&mdata_1), "Test".to_string()).await;
         let cast_req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&cast_req.message),
@@ -342,14 +372,16 @@ mod test {
         let cloned_id_1 = fid_1;
         let mut cloned_handle_2 = handle_2.clone();
 
-        let return_handle = tokio::spawn(async move { cloned_handle_2.call(cloned_id_1, "Test".to_string()).await });
+        let return_handle = tokio::spawn(async move { cloned_handle_2.call(cloned_id_1, Some(&mdata_2), "Test".to_string()).await });
 
         let call_req = handle_1.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&call_req.message),
             std::mem::discriminant(&crate::core::Message::Call("".to_string()))
         );
-        handle_1.reply(call_req.source_id, call_req.channel_id, CallRet::NoReply).await;
+        handle_1
+            .reply(call_req.source_id, call_req.channel_id, Some(&mdata_1), CallRet::NoReply)
+            .await;
 
         let repl = return_handle.await.unwrap();
         assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));

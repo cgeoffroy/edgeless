@@ -59,6 +59,7 @@ impl EgressResource {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
+                    metadata: _,
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
@@ -74,7 +75,7 @@ impl EgressResource {
                     Ok(val) => val,
                     Err(_) => {
                         dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                            .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Err)
                             .await;
                         continue;
                     }
@@ -85,12 +86,12 @@ impl EgressResource {
                         Ok(resp) => {
                             let serialized_resp = edgeless_http::response_to_string(&resp);
                             cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(serialized_resp))
+                                .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Reply(serialized_resp))
                                 .await;
                         }
                         Err(_) => {
                             cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                                .reply(source_id, channel_id, None, edgeless_dataplane::core::CallRet::Err)
                                 .await;
                         }
                     }

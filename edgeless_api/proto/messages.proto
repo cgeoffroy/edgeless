@@ -456,6 +456,12 @@ message EventTimestamp {
     uint32 nsecs  = 2;
 }
 
+// Metadata associated with an event
+message EventMetadata {
+    // The root trace
+    uint64 root = 1;
+}
+
 // Event.
 message Event {
     // The function instance that is expected to handle the event (callee).
@@ -468,6 +474,8 @@ message Event {
     EventData      msg        = 4;
     // Timestamp of when the message was created.
     EventTimestamp created    = 5;
+    // Ongoing metadata
+    EventMetadata metadata    = 6;
 }
 
 // Resource provider specification.
@@ -529,10 +537,13 @@ message FunctionInstanceInit {
 // Argument of GuestAPIFunction::Cast() and GuestAPIFunction::Call().
 message InputEventData {
     // The function instance that generated the event.
-    InstanceId src = 1;
-    
+    InstanceId src         = 1;
+
+    // The event metadata that follows the event
+    EventMetadata metadata = 2;
+
     // The event payload. Can be empty.
-    bytes msg     = 2;
+    bytes msg              = 3;
 }
 
 // Types of CallReturn.
@@ -557,25 +568,31 @@ message CallReturn {
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
 message OutputEventData {
     // The event originator (to identify the function instance on the host).
-    InstanceId originator = 1;
+    InstanceId originator  = 1;
 
     // The alias of the function instance recipient of this event.
-    string alias          = 2;
-    
+    string alias           = 2;
+
+    // The event metadata
+    EventMetadata metadata = 3;
+
     // The event payload. Can be empty.
-    bytes msg             = 3;
+    bytes msg              = 4;
 }
 
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
 message OutputEventDataRaw {
     // The event originator (to identify the function instance on the host).
-    InstanceId originator = 1;
+    InstanceId originator  = 1;
 
     // The function instance recipient of this event.
-    InstanceId dst        = 2;
+    InstanceId dst         = 2;
+
+    // The event metadata
+    EventMetadata metadata = 3;
     
     // The event payload. Can be empty.
-    bytes msg             = 3;
+    bytes msg              = 4;
 }
 
 enum TelemetryLogLevel {
@@ -607,13 +624,16 @@ message DelayedEventData {
     InstanceId originator = 1;
 
     // The alias of the function instance recipient of this event.
-    string alias          = 2;
+    string alias           = 2;
+
+    // The event metadata
+    EventMetadata metadata = 3;
     
     // The event payload. Can be empty.
-    bytes msg             = 3;
+    bytes msg              = 4;
 
     // The delay after which this event has to be generated, in ms.
-    uint64 delay          = 4;
+    uint64 delay           = 5;
 }
 
 // Argument of GuestAPIHost::Sync().

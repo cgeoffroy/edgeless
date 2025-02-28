@@ -111,6 +111,7 @@ impl ContainerFunction {
                                 .cast(edgeless_api::guest_api_host::OutputEventData {
                                     originator: instance_id.unwrap(),
                                     alias: "output".to_string(),
+                                    metadata: event.metadata,
                                     msg: event.msg,
                                 })
                                 .await

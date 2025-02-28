@@ -198,10 +198,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, created} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, metadata, message, created} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
+                        metadata.as_ref(),
                         message,
                         created
                     ).await?;
@@ -214,6 +215,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
         channel_id: u64,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         message: edgeless_dataplane::core::Message,
         created: edgeless_api::function_instance::EventTimestamp,
     ) -> Result<(), super::FunctionInstanceError> {
@@ -226,8 +228,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         );
 
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, metadata, payload).await,
+            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, metadata, payload, channel_id).await,
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -238,6 +240,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     async fn process_cast_message(
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         payload: String,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
@@ -245,7 +248,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .cast(&source_id, &payload)
+            .cast(&source_id, metadata, &payload)
             .await?;
 
         self.telemetry_handle.observe(
@@ -258,6 +261,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     async fn process_call_message(
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         payload: String,
         channel_id: u64,
     ) -> Result<(), super::FunctionInstanceError> {
@@ -267,7 +271,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .call(&source_id, &payload)
+            .call(&source_id, metadata, &payload)
             .await?;
 
         self.telemetry_handle.observe(
@@ -276,7 +280,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         );
 
         let mut wh = self.data_plane.clone();
-        wh.reply(source_id, channel_id, res).await;
+        wh.reply(source_id, channel_id, metadata, res).await;
         Ok(())
     }
 

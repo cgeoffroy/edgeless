@@ -11,6 +11,7 @@ pub trait DataPlaneLink: Send + Sync {
     async fn handle_send(
         &mut self,
         target: &edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
         created: &edgeless_api::function_instance::EventTimestamp,
@@ -38,6 +39,7 @@ pub enum Message {
 pub struct DataplaneEvent {
     pub source_id: edgeless_api::function_instance::InstanceId,
     pub channel_id: u64,
+    pub metadata: Option<edgeless_api_core::invocation::EventMetadata>,
     pub message: Message,
     pub created: edgeless_api::function_instance::EventTimestamp,
 }

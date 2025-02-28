@@ -103,6 +103,7 @@ impl OllamaResource {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id: _,
                     channel_id: _,
+                    metadata: _,
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
@@ -131,7 +132,7 @@ impl OllamaResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, response)) => {
-                            let _ = dataplane_handle.send(target, response).await;
+                            let _ = dataplane_handle.send(target, None, response).await;
                         }
                         Err(err) => {
                             log::warn!("Error from ollama: {}", err)

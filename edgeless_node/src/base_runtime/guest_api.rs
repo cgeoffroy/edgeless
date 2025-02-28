@@ -25,29 +25,45 @@ pub enum GuestAPIError {
 }
 
 impl GuestAPIHost {
-    pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
+    pub async fn cast_alias(
+        &mut self,
+        alias: &str,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: &str,
+    ) -> Result<(), GuestAPIError> {
+        log::warn!("Cast_alias {:?} {}", metadata, msg);
         if alias == "self" {
-            self.data_plane.send(self.instance_id, msg.to_string()).await;
+            self.data_plane.send(self.instance_id, metadata, msg.to_string()).await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            self.data_plane.send(target, msg.to_string()).await;
+            self.data_plane.send(target, metadata, msg.to_string()).await;
             Ok(())
         } else {
             Err(GuestAPIError::UnknownAlias)
         }
     }
 
-    pub async fn cast_raw(&mut self, target: edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), GuestAPIError> {
-        self.data_plane.send(target, msg.to_string()).await;
+    pub async fn cast_raw(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: &str,
+    ) -> Result<(), GuestAPIError> {
+        self.data_plane.send(target, metadata, msg.to_string()).await;
         Ok(())
     }
 
-    pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+    pub async fn call_alias(
+        &mut self,
+        alias: &str,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        msg: &str,
+    ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         if alias == "self" {
-            self.call_raw(self.instance_id, msg).await
+            self.call_raw(self.instance_id, metadata, msg).await
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            return self.call_raw(target, msg).await;
+            return self.call_raw(target, metadata, msg).await;
             // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {
             log::warn!("Unknown alias.");
@@ -58,13 +74,14 @@ impl GuestAPIHost {
     pub async fn call_raw(
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call(target, msg.to_string())).fuse() => {
+            call_res = Box::pin(self.data_plane.call(target, metadata, msg.to_string())).fuse() => {
                 Ok(call_res)
             }
         }
@@ -81,9 +98,16 @@ impl GuestAPIHost {
         self.instance_id
     }
 
-    pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
+    pub async fn delayed_cast(
+        &mut self,
+        delay: u64,
+        target_alias: &str,
+        metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
+        payload: &str,
+    ) -> Result<(), GuestAPIError> {
         let mut cloned_plane = self.data_plane.clone();
         let cloned_msg = payload.to_string();
+        let cloned_metadata = metadata.cloned();
 
         let target_instance_id = if target_alias == "self" {
             self.instance_id
@@ -96,7 +120,7 @@ impl GuestAPIHost {
 
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            cloned_plane.send(target_instance_id, cloned_msg).await;
+            cloned_plane.send(target_instance_id, cloned_metadata.as_ref(), cloned_msg).await;
         });
 
         Ok(())

@@ -34,6 +34,10 @@ impl CoapInvocationServer {
                             target: invocation_event.target,
                             source: invocation_event.source,
                             stream_id: invocation_event.stream_id,
+                            metadata: invocation_event.metadata.map(|x| x),
+                            // metadata: Some(crate::invocation::EventMetadata {
+                            //     root: invocation_event.metadata.root,
+                            // }),
                             data: match invocation_event.data {
                                 edgeless_api_core::invocation::EventData::Cast(val) => {
                                     crate::invocation::EventData::Cast(String::from_utf8(val.to_vec()).unwrap())
@@ -83,6 +87,8 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
             target: event.target,
             source: event.source,
             stream_id: event.stream_id,
+            metadata: event.metadata,
+            // metadata: edgeless_api_core::invocation::EventMetadata { root: event.metadata.root },
             data: match &event.data {
                 crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes()),
                 crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val.as_bytes()),
