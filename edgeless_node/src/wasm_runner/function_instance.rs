@@ -1,8 +1,14 @@
+use tonic::metadata;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use wasmtime::AsContextMut;
+
+use opentelemetry::{
+    global,
+    trace::{FutureExt, Span, SpanKind, Status, TraceContextExt, Tracer},
+};
 
 use crate::base_runtime::FunctionInstanceError;
 
@@ -268,13 +274,25 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     ) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::info!("Cast {:?} {:?}", metadata, msg);
 
-        let _: Result<(), FunctionInstanceError> = {
-            self.set_metadata
-                .call_async(&mut self.store, (12301, 11102, 23407, 99904))
-                .await
-                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
-            Ok(())
+        let _: Result<(), FunctionInstanceError> = match metadata {
+            None => Ok(()),
+            Some(x) => {
+                let tmp = x.to_words();
+                self.set_metadata
+                    .call_async(&mut self.store, (tmp[0], tmp[1], x.span_id, 0))
+                    .await
+                    .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+                Ok(())
+            }
         };
+
+        // let _: Result<(), FunctionInstanceError> = {
+        //     self.set_metadata
+        //         .call_async(&mut self.store, (12301, 11102, 23407, 99904))
+        //         .await
+        //         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+        //     Ok(())
+        // };
 
         // Depending on the Function, we might employ a basic arena/bump allocator that we must reset at the end of a transaction.
         // This might be a noop if the function defines a working version of `edgeless_mem_free`.
@@ -348,13 +366,36 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
         log::info!("Call {:?} {:?}", metadata, msg);
 
-        let _: Result<(), FunctionInstanceError> = {
-            self.set_metadata
-                .call_async(&mut self.store, (434301, 434302, metadata.unwrap().root, 434304))
-                .await
-                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
-            Ok(())
+        let otelctx = metadata.unwrap().into_ctx();
+
+        let tracer = global::tracer("scope-node");
+        let parent_cx = opentelemetry::Context::current().with_remote_span_context(otelctx);
+        let mut span = tracer
+            .span_builder("function_instance:call")
+            .with_kind(SpanKind::Server)
+            .start_with_context(&tracer, &parent_cx);
+        span.add_event("Writing event metadata in vm", vec![]);
+
+        let _: Result<(), FunctionInstanceError> = match metadata {
+            None => Ok(()),
+            Some(x) => {
+                let tmp = x.to_words();
+                self.set_metadata
+                    .call_async(&mut self.store, (tmp[0], tmp[1], x.span_id, 0))
+                    .await
+                    .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+                Ok(())
+            }
         };
+        // let _: Result<(), FunctionInstanceError> = {
+        //     self.set_metadata
+        //         .call_async(&mut self.store, (434301, 434302, metadata.unwrap().span_id, 0))
+        //         .await
+        //         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+        //     Ok(())
+        // };
+
+        span.add_event("Writing low level arguments to handle call", vec![]);
 
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
@@ -395,6 +436,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             .call_async(&mut self.store, 4)
             .await
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("call failed: {}", e)))?;
+
+        span.add_event("Calking wasm handle_call", vec![]);
 
         let callret_type = self
             .edgefunctione_handle_call
@@ -454,6 +497,9 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 .await
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         }
+
+        span.set_status(opentelemetry::trace::Status::Ok);
+        span.end();
 
         ret
     }

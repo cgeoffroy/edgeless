@@ -5,6 +5,12 @@
 
 use futures::FutureExt;
 
+use opentelemetry::{
+    global,
+    trace::{Span, SpanKind, Status, TraceContextExt, Tracer},
+    KeyValue,
+};
+
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
@@ -118,8 +124,20 @@ impl GuestAPIHost {
             return Err(GuestAPIError::UnknownAlias);
         };
 
+        let this_metadata = metadata.unwrap();
+
+        let otelctx = this_metadata.into_ctx();
+
+        let tracer = opentelemetry::global::tracer("scope-node");
+        let parent_cx = opentelemetry::Context::current().with_remote_span_context(otelctx);
+        let mut span = tracer
+            .span_builder("guest_api:delayed_cast")
+            .with_kind(SpanKind::Server)
+            .start_with_context(&tracer, &parent_cx);
+
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
+            span.end();
             cloned_plane.send(target_instance_id, cloned_metadata.as_ref(), cloned_msg).await;
         });
 

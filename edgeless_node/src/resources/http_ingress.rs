@@ -4,6 +4,10 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::function_instance::{ComponentId, InstanceId};
 use http_body_util::BodyExt;
+use opentelemetry::{
+    global,
+    trace::{FutureExt, Span, SpanKind, Status, Tracer},
+};
 use std::str::FromStr;
 
 pub struct HttpIngressResourceSpec {}
@@ -60,6 +64,11 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
         let cloned = self.interests.clone();
         let cloned_addr = self.listen_addr.clone();
         log::info!("Call into http_ingress {:?}", req.headers());
+
+        let tracer = global::tracer("scope-node");
+        let mut span = tracer.span_builder("http_ingress").with_kind(SpanKind::Client).start(&tracer);
+        span.add_event("Incoming request", vec![]);
+
         Box::pin(async move {
             let mut lck = cloned.lock().await;
 
@@ -79,6 +88,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                     None
                 }
             }) {
+                span.add_event("Preparing EdgelessHTTPRequest", vec![]);
                 let msg = edgeless_http::EdgelessHTTPRequest {
                     host: host.to_string(),
                     protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
@@ -97,8 +107,12 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         })
                         .collect(),
                 };
+                span.add_event("Serializing the msg", vec![]);
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+                let this_metadata = edgeless_api_core::invocation::EventMetadata {
+                    trace_id: span.span_context().trace_id().to_bytes(),
+                    span_id: u64::from_be_bytes(span.span_context().span_id().to_bytes()),
+                };
                 let res = lck.dataplane.call(target, Some(&this_metadata), serialized_msg).await;
                 if let edgeless_dataplane::core::CallRet::Reply(data) = res {
                     let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
@@ -117,6 +131,8 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                             }
                         }
                     }
+                    span.set_status(Status::Ok);
+                    span.end();
                     return Ok(response_builder);
                 }
             }

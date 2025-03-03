@@ -148,7 +148,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         self.function_client_api
             .cast(edgeless_api::guest_api_function::InputEventData {
                 src: *src,
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: msg.into(),
             })
             .await
@@ -166,7 +166,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
             .function_client_api
             .call(edgeless_api::guest_api_function::InputEventData {
                 src: *src,
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: msg.into(),
             })
             .await

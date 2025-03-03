@@ -3,7 +3,15 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::borrow::BorrowMut;
+
 use wasmtime::AsContextMut;
+
+use opentelemetry::{
+    global,
+    trace::{Span, SpanKind, Status, TraceContextExt, Tracer},
+    KeyValue,
+};
 
 /// Binds the WASM component's imports to the function's GuestAPIHost.
 pub struct GuestAPI {
@@ -46,7 +54,7 @@ pub async fn cast_raw(
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
-    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+    let this_metadata = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
     let u = caller.get_export("get_metadata_span_id");
     let y = u.unwrap().into_func();
@@ -57,7 +65,6 @@ pub async fn cast_raw(
         .call_async(&mut caller, &[], &mut x)
         .await
         .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
-    panic!("division by zero &");
 
     caller
         .data_mut()
@@ -87,8 +94,7 @@ pub async fn call_raw(
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
-    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
-    panic!("division by zero 2");
+    let this_metadata = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
     let call_ret = caller
         .data_mut()
@@ -111,6 +117,49 @@ pub async fn call_raw(
     }
 }
 
+async fn gg(caller: &mut wasmtime::Caller<'_, GuestAPI>) -> wasmtime::Result<(u128, u64)> {
+    let gmsi = caller.borrow_mut().get_export("get_metadata_span_id").unwrap().into_func();
+    log::warn!("gmsi {:?}", gmsi);
+    let mut x = [wasmtime::Val::I64(4564)];
+    log::error!("_______________________________ {:?}", x[0]);
+    gmsi.unwrap()
+        .call_async(&mut caller.borrow_mut(), &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    log::error!("_______________________________ pre span_id {:?}", x[0]);
+    let span_id = x[0].clone().unwrap_i64() as u64;
+    log::error!("_______________________________ span_id {:?}", span_id);
+
+    let gmtdl = caller.borrow_mut().get_export("get_metadata_trace_id_low").unwrap().into_func();
+    log::warn!("gmtdl {:?}", gmtdl);
+    log::error!("_______________________________ {:?}", x[0]);
+    gmtdl
+        .unwrap()
+        .call_async(&mut caller.borrow_mut(), &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata_trace_id_low {:?}", e)))?;
+    log::error!("_______________________________ pre trace_id_low {:?}", x[0]);
+    let trace_id_low = x[0].clone().unwrap_i64() as u64;
+    log::error!("_______________________________ trace_id_low {:?}", trace_id_low);
+
+    let gmtdh = caller.borrow_mut().get_export("get_metadata_trace_id_high").unwrap().into_func();
+    log::warn!("gmtdh {:?}", gmtdh);
+    log::error!("_______________________________ {:?}", x[0]);
+    gmtdh
+        .unwrap()
+        .call_async(&mut caller.borrow_mut(), &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata_trace_id_high {:?}", e)))?;
+    log::error!("_______________________________ pre trace_id_high {:?}", x[0]);
+    let trace_id_high = x[0].clone().unwrap_i64() as u64;
+    log::error!("_______________________________ trace_id_high {:?}", trace_id_high);
+
+    let res: u128 = unsafe { std::mem::transmute::<[u64; 2], u128>([trace_id_low, trace_id_high]) };
+    log::error!("_______________________________ res {:?}", res);
+
+    Ok((res, span_id))
+}
+
 pub async fn cast(
     mut caller: wasmtime::Caller<'_, GuestAPI>,
     target_ptr: i32,
@@ -120,30 +169,39 @@ pub async fn cast(
 ) -> wasmtime::Result<()> {
     let mem = get_memory(&mut caller)?; // HERE
 
-    let u = caller.get_export("get_metadata_span_id");
-    let y = u.unwrap().into_func();
-    log::error!("Cast raw {:?}", y);
-    println!("Cast raw {:?}", y);
-    let mut x = [wasmtime::Val::I64(4564)];
-    log::error!("_______________________________ {:?}", x[0]);
+    // let u: Option<wasmtime::Extern> = caller.get_export("get_metadata_span_id");
+    // let y = u.unwrap().into_func();
+    // log::error!("Cast raw {:?}", y);
+    // println!("Cast raw {:?}", y);
+    // let mut x = [wasmtime::Val::I64(4564)];
+    // log::error!("_______________________________ {:?}", x[0]);
 
-    y.unwrap()
-        .call_async(&mut caller, &[], &mut x)
-        .await
-        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
-    log::error!("_______________________________ {:?}", x[0]);
-    y.unwrap()
-        .call_async(&mut caller, &[], &mut x)
-        .await
-        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
-    log::error!("_______________________________ {:?}", x[0]);
+    // y.unwrap()
+    //     .call_async(&mut caller, &[], &mut x)
+    //     .await
+    //     .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    // log::error!("_______________________________ {:?}", x[0]);
+    // let span_id = x[0].clone().unwrap_i64() as u64;
+
+    // y.unwrap()
+    //     .call_async(&mut caller, &[], &mut x)
+    //     .await
+    //     .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    // log::error!("_______________________________ {:?}", x[0]);
+    let (trace_id, span_id) = gg(&mut caller).await?;
+    let this_metadata = edgeless_api_core::invocation::EventMetadata::from(trace_id, span_id);
+
+    let otelctx = this_metadata.into_ctx();
+
+    let tracer = opentelemetry::global::tracer("scope-node");
+    let parent_cx = opentelemetry::Context::current().with_remote_span_context(otelctx);
+    let mut span = tracer
+        .span_builder("guest_api_binding:cast")
+        .with_kind(SpanKind::Internal)
+        .start_with_context(&tracer, &parent_cx);
 
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
-
-    let this_metadata = edgeless_api_core::invocation::EventMetadata {
-        root: x[0].i64().unwrap() as u64,
-    };
 
     match caller.data_mut().host.cast_alias(&target, Some(&this_metadata), &payload).await {
         Ok(_) => {}
@@ -152,6 +210,10 @@ pub async fn cast(
             log::warn!("Cast to unknown target: {}", target);
         }
     };
+
+    span.set_attribute(KeyValue::new("target", target));
+    span.set_status(opentelemetry::trace::Status::Ok);
+    span.end();
 
     Ok(())
 }
@@ -165,7 +227,6 @@ pub async fn call(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> wasmtime::Result<i32> {
-    panic!("division by zero 4");
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
 
@@ -173,7 +234,7 @@ pub async fn call(
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     log::info!("Call {} {}", target, payload);
-    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+    let this_metadata = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
     let call_ret = caller
         .data_mut()
@@ -205,10 +266,23 @@ pub async fn delayed_cast(
     payload_len: i32,
 ) -> wasmtime::Result<()> {
     let mem = get_memory(&mut caller)?;
+
+    let (trace_id, span_id) = gg(&mut caller).await?;
+    let this_metadata = edgeless_api_core::invocation::EventMetadata::from(trace_id, span_id);
+
+    let otelctx = this_metadata.into_ctx();
+
+    let tracer = opentelemetry::global::tracer("scope-node");
+    let parent_cx = opentelemetry::Context::current().with_remote_span_context(otelctx);
+    let mut span = tracer
+        .span_builder("guest_api_binding:delayed_cast")
+        .with_kind(SpanKind::Server)
+        .start_with_context(&tracer, &parent_cx);
+
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
-    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+    //let this_metadata = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
     caller
         .data_mut()
@@ -216,6 +290,10 @@ pub async fn delayed_cast(
         .delayed_cast(delay_ms as u64, &target, Some(&this_metadata), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
+
+    span.set_status(opentelemetry::trace::Status::Ok);
+    span.end();
+
     Ok(())
 }
 

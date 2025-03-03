@@ -178,10 +178,21 @@ pub fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventDa
         Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
             Ok(src) => Ok(crate::guest_api_function::InputEventData {
                 src,
-                metadata: api_instance
-                    .metadata
-                    .as_ref()
-                    .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
+                metadata: match api_instance.metadata.as_ref() {
+                    None => None,
+                    Some(x) => {
+                        let raw: Result<[u8; 16], _> = x.trace_id.clone().try_into();
+                        if raw.is_err() {
+                            return Err(anyhow::anyhow!("Invalid trace_id"));
+                        }
+                        Some(edgeless_api_core::invocation::EventMetadata::new(&raw.unwrap(), x.span_id))
+                    }
+                },
+                // metadata: api_instance.metadata.as_ref().map(|x| {
+                //     let raw: [u8; 16] = x.trace_id.clone().try_into().unwrap();
+                //     let tmp = u128::from_be_bytes(raw.clone());
+                //     edgeless_api_core::invocation::EventMetadata::new(tmp, x.span_id)
+                // }),
                 msg: api_instance.msg.clone(),
             }),
             Err(e) => Err(e),
@@ -218,7 +229,10 @@ fn serialize_function_instance_init(init_data: &crate::guest_api_function::Funct
 fn serialize_input_event_data(event: &crate::guest_api_function::InputEventData) -> crate::grpc_impl::api::InputEventData {
     crate::grpc_impl::api::InputEventData {
         src: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.src)),
-        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata { root: x.root }),
+        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata {
+            trace_id: x.trace_id.to_vec(),
+            span_id: x.span_id,
+        }),
         msg: event.msg.clone(),
     }
 }
@@ -294,12 +308,12 @@ mod test {
         let messages = vec![
             InputEventData {
                 src: InstanceId::new(uuid::Uuid::new_v4()),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![0, 42, 0, 42, 99],
             },
             InputEventData {
                 src: InstanceId::none(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![],
             },
         ];

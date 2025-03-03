@@ -16,6 +16,16 @@ pub mod state_management;
 pub mod wasm_runner;
 #[cfg(feature = "wasmi")]
 pub mod wasmi_runner;
+use opentelemetry::{
+    global,
+    trace::{FutureExt, Span, SpanKind, Status, TraceContextExt, TraceError, Tracer},
+    Context, KeyValue,
+};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{propagation::TraceContextPropagator, runtime, trace as sdktrace, trace::TracerProvider, Resource};
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
+use opentelemetry_semantic_conventions::trace;
+use opentelemetry_stdout::SpanExporter;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -603,9 +613,50 @@ async fn fill_resources(
     ret
 }
 
+fn init_tracer() {
+    log::info!("initializing the OTL tracer to Jaeger ?????????????????????????");
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let span_exporter = {
+        let otlp_span_exporter = opentelemetry_otlp::new_exporter()
+            .tonic()
+            .with_endpoint("http://172.17.0.3:4317")
+            .build_span_exporter();
+        match otlp_span_exporter {
+            Ok(v) => v,
+            _ => return,
+        }
+    };
+
+    let processor = {
+        let batch_config = opentelemetry_sdk::trace::BatchConfigBuilder::default()
+            .with_max_queue_size(4096)
+            .with_scheduled_delay(std::time::Duration::from_millis(5000))
+            .build();
+        opentelemetry_sdk::trace::BatchSpanProcessor::builder(span_exporter, runtime::Tokio)
+            .with_batch_config(batch_config)
+            .build()
+    };
+
+    let provider = TracerProvider::builder()
+        .with_span_processor(processor)
+        .with_config(sdktrace::Config::default().with_resource(Resource::new(vec![KeyValue::new(SERVICE_NAME, "tracing-edgeless")])))
+        .build();
+
+    global::set_tracer_provider(provider);
+}
+
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::info!("Starting Edgeless Node");
     log::debug!("Settings: {:?}", settings);
+    init_tracer();
+
+    let tracer = global::tracer("scope-node");
+    tracer.in_span("node_main", |cx| {
+        let span = cx.span();
+        span.add_event("toto", vec![]);
+        span.set_status(Status::error("fifi"));
+    });
 
     // Create the state manager.
     let state_manager = Box::new(state_management::StateManager::new().await);

@@ -167,7 +167,7 @@ mod test {
             target: fid_wrong_component_id,
             source: fid_source,
             stream_id: 0,
-            metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+            metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
         })
@@ -181,7 +181,7 @@ mod test {
                 target: fid_wrong_node_id,
                 source: fid_source,
                 stream_id: 0,
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
                 created: created.clone(),
             })
@@ -194,7 +194,7 @@ mod test {
             target: fid_target,
             source: fid_source,
             stream_id: 0,
-            metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+            metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
         })
@@ -236,7 +236,7 @@ mod test {
             function_id: fid_target.function_id,
         };
 
-        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
         let (api_sender_node_2, mut api_receiver_node_2) = futures::channel::mpsc::unbounded::<edgeless_api::invocation::Event>();
         let node_2_api: Box<dyn edgeless_api::invocation::InvocationAPI> = Box::new(MockInvocationAPI {

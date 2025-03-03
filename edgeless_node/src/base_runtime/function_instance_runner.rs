@@ -33,6 +33,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     init_payload: Option<String>,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
     instance_id: edgeless_api::function_instance::InstanceId,
+    org_function_class_id: String,
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInstanceType> {
@@ -74,6 +75,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
                 instance_id,
+                spawn_req.code.function_class_id,
             )
             .await,
         );
@@ -117,6 +119,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         init_param: Option<String>,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         instance_id: edgeless_api::function_instance::InstanceId,
+        org_function_class_id: String,
     ) -> Self {
         Self {
             poison_pill_receiver,
@@ -130,6 +133,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             init_payload: init_param,
             runtime_api,
             instance_id,
+            org_function_class_id,
         }
     }
 

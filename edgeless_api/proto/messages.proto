@@ -459,7 +459,8 @@ message EventTimestamp {
 // Metadata associated with an event
 message EventMetadata {
     // The root trace
-    uint64 root = 1;
+    bytes trace_id = 1;
+    uint64 span_id = 2;
 }
 
 // Event.

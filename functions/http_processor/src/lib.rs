@@ -33,6 +33,8 @@ impl EdgeFunction for ProcesorFun {
             }
         };
 
+        delayed_cast(2, "self", b"Wakeup");
+
         CallRet::Reply(OwnedByteBuff::new_from_slice(edgeless_http::response_to_string(&resp).as_bytes()))
     }
 

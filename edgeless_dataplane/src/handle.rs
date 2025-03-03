@@ -279,7 +279,7 @@ mod test {
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
         handle_1.send(fid_2, Some(&mdata_1), "Test".to_string()).await;
 
@@ -301,7 +301,7 @@ mod test {
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
         let mdata_2 = mdata_1.clone();
 
         let return_handle = tokio::spawn(async move { handle_1.call(fid_2, Some(&mdata_2), "Test".to_string()).await });
@@ -359,7 +359,7 @@ mod test {
         let mut handle_1 = provider_1.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider_2.get_handle_for(fid_2.clone()).await;
 
-        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 424242 };
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
         let mdata_2 = mdata_1.clone();
 
         handle_1.send(fid_2.clone(), Some(&mdata_1), "Test".to_string()).await;

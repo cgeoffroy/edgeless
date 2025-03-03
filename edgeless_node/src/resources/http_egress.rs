@@ -1,8 +1,15 @@
+use edgeless_api_core::invocation::EventMetadata;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
+
+use opentelemetry::{
+    global,
+    trace::{FutureExt, Span, SpanKind, Status, TraceContextExt, Tracer},
+    KeyValue,
+};
 
 pub struct HttpEgressResourceSpec {}
 
@@ -64,12 +71,24 @@ impl EgressResource {
                     created,
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
+
+                let parent_cx = metadata.map_or(opentelemetry::Context::current(), |x| {
+                    opentelemetry::Context::current().with_remote_span_context(x.into_ctx())
+                });
+                let tracer = opentelemetry::global::tracer("scope-node");
+                let mut span = tracer
+                    .span_builder("guest_api_binding:cast")
+                    .with_kind(SpanKind::Internal)
+                    .start_with_context(&tracer, &parent_cx);
+
                 let message_data = match message {
                     Message::Call(data) => data,
                     _ => {
                         continue;
                     }
                 };
+
+                span.add_event("DataplaneEvent", vec![KeyValue::new("message", message_data.clone())]);
 
                 let req = match edgeless_http::request_from_string(&message_data) {
                     Ok(val) => val,
@@ -95,6 +114,7 @@ impl EgressResource {
                                 .await;
                         }
                     }
+                    span.end();
                 });
                 crate::resources::observe_execution(started, &mut telemetry_handle, true);
             }

@@ -37,6 +37,7 @@ heapless = "0.8"
 # prost = {version = "0.11", optional = true}
 # regex = "1.8"
 # serde = {version = "1", features=["derive"]}
+opentelemetry = { version = "0.26.0", features = ["trace", "testing"] }
 
 # [build-dependencies]
 # tonic-build = {version = "0.9", optional = true}

@@ -80,11 +80,12 @@ mod test {
 
     #[test]
     fn test_g() {
+        let words: [u64; 2] = unsafe { std::mem::transmute::<u128, [u64; 2]>(12345678910111213141516u128) };
         let _ = unsafe {
-            set_metadata(12, 0, 45, 67);
+            set_metadata(words[0], words[1], 45, 67);
         };
-        assert_eq!(12, unsafe { get_metadata_trace_id_high() });
-        assert_eq!(23, unsafe { get_metadata_trace_id_low() });
+        assert_eq!(words[1], unsafe { get_metadata_trace_id_high() });
+        assert_eq!(words[0], unsafe { get_metadata_trace_id_low() });
         assert_eq!(45, unsafe { get_metadata_span_id() });
         assert_eq!(67, unsafe { get_metadata_parent_id() });
     }

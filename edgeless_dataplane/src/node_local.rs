@@ -141,7 +141,7 @@ mod test {
         let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         let _handle_2 = provider.new_link(fid_2.clone(), sender_2).await;
 
-        let mdata_1 = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+        let mdata_1 = edgeless_api_core::invocation::EventMetadata::from(4242, 4242);
 
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());

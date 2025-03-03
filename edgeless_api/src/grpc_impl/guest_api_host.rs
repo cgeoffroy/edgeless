@@ -225,10 +225,21 @@ pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEvent
             None => return Err(anyhow::anyhow!("missing originator field")),
         },
         alias: api_instance.alias.clone(),
-        metadata: api_instance
-            .metadata
-            .as_ref()
-            .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
+        metadata: match api_instance.metadata.as_ref() {
+            None => None,
+            Some(x) => {
+                let tmp: Result<[u8; 16], _> = x.trace_id.clone().try_into();
+                if tmp.is_err() {
+                    return Err(anyhow::anyhow!("invalid trace_id size"));
+                } else {
+                    Some(edgeless_api_core::invocation::EventMetadata::new(&tmp.unwrap(), x.span_id))
+                }
+            }
+        },
+        // metadata: api_instance
+        //     .metadata
+        //     .as_ref()
+        //     .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
         msg: api_instance.msg.clone(),
     })
 }
@@ -247,10 +258,21 @@ pub fn parse_output_event_data_raw(
                     None => return Err(anyhow::anyhow!("missing originator field")),
                 },
                 dst,
-                metadata: api_instance
-                    .metadata
-                    .as_ref()
-                    .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
+                metadata: match api_instance.metadata.as_ref() {
+                    None => None,
+                    Some(x) => {
+                        let tmp: Result<[u8; 16], _> = x.trace_id.clone().try_into();
+                        if tmp.is_err() {
+                            return Err(anyhow::anyhow!("invalid trace_id size"));
+                        } else {
+                            Some(edgeless_api_core::invocation::EventMetadata::new(&tmp.unwrap(), x.span_id))
+                        }
+                    }
+                },
+                // metadata: api_instance
+                //     .metadata
+                //     .as_ref()
+                //     .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
                 msg: api_instance.msg.clone(),
             }),
             Err(err) => Err(err),
@@ -294,10 +316,21 @@ pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEve
         },
         delay: api_instance.delay,
         alias: api_instance.alias.clone(),
-        metadata: api_instance
-            .metadata
-            .as_ref()
-            .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
+        metadata: match api_instance.metadata.as_ref() {
+            None => None,
+            Some(x) => {
+                let tmp: Result<[u8; 16], _> = x.trace_id.clone().try_into();
+                if tmp.is_err() {
+                    return Err(anyhow::anyhow!("invalid trace_id size"));
+                } else {
+                    Some(edgeless_api_core::invocation::EventMetadata::new(&tmp.unwrap(), x.span_id))
+                }
+            }
+        },
+        // metadata: api_instance
+        //     .metadata
+        //     .as_ref()
+        //     .map(|x| edgeless_api_core::invocation::EventMetadata { root: x.root }),
         msg: api_instance.msg.clone(),
     })
 }
@@ -319,7 +352,10 @@ fn serialize_output_event_data(event: &crate::guest_api_host::OutputEventData) -
     crate::grpc_impl::api::OutputEventData {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         alias: event.alias.clone(),
-        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata { root: x.root }),
+        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata {
+            trace_id: x.trace_id.to_vec(),
+            span_id: x.span_id,
+        }),
         msg: event.msg.clone(),
     }
 }
@@ -328,7 +364,10 @@ fn serialize_output_event_data_raw(event: &crate::guest_api_host::OutputEventDat
     crate::grpc_impl::api::OutputEventDataRaw {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         dst: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.dst)),
-        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata { root: x.root }),
+        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata {
+            trace_id: x.trace_id.to_vec(),
+            span_id: x.span_id,
+        }),
         msg: event.msg.clone(),
     }
 }
@@ -353,7 +392,10 @@ fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData)
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         delay: event.delay,
         alias: event.alias.clone(),
-        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata { root: x.root }),
+        metadata: event.metadata.as_ref().map(|x| crate::grpc_impl::api::EventMetadata {
+            trace_id: x.trace_id.to_vec(),
+            span_id: x.span_id,
+        }),
         msg: event.msg.clone(),
     }
 }
@@ -382,13 +424,13 @@ mod test {
             OutputEventData {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 alias: "".to_string(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![],
             },
             OutputEventData {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 alias: "my-fun".to_string(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![0, 42, 0, 42, 99],
             },
         ];
@@ -406,13 +448,13 @@ mod test {
             OutputEventDataRaw {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 dst: InstanceId::none(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![],
             },
             OutputEventDataRaw {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 dst: InstanceId::new(uuid::Uuid::new_v4()),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![0, 42, 0, 42, 99],
             },
         ];
@@ -462,14 +504,14 @@ mod test {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 delay: 0_u64,
                 alias: "".to_string(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![],
             },
             DelayedEventData {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 delay: 42_u64,
                 alias: "my-fun".to_string(),
-                metadata: Some(edgeless_api_core::invocation::EventMetadata { root: 4242 }),
+                metadata: Some(edgeless_api_core::invocation::EventMetadata::from(4242, 4242)),
                 msg: vec![0, 42, 0, 42, 99],
             },
         ];
