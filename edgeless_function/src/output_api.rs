@@ -2,24 +2,28 @@
 // SPDX-License-Identifier: MIT
 
 pub fn cast_raw(target: crate::InstanceId, msg: &[u8]) {
+    log::error!("A");
     unsafe {
         crate::imports::cast_raw_asm(target.node_id.as_ptr(), target.component_id.as_ptr(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn cast(name: &str, msg: &[u8]) {
+    log::error!("b");
     unsafe {
         crate::imports::cast_asm(name.as_bytes().as_ptr(), name.len(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn delayed_cast(delay_ms: u64, name: &str, msg: &[u8]) {
+    log::error!("C");
     unsafe {
         crate::imports::delayed_cast_asm(delay_ms, name.as_bytes().as_ptr(), name.len(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn call_raw(target: crate::InstanceId, msg: &[u8]) -> crate::CallRet {
+    log::error!("D");
     unsafe {
         let mut out_ptr_ptr: *mut u8 = core::ptr::null_mut();
         let mut out_len_ptr: usize = 0;
@@ -42,6 +46,7 @@ pub fn call_raw(target: crate::InstanceId, msg: &[u8]) -> crate::CallRet {
 }
 
 pub fn call(name: &str, msg: &[u8]) -> crate::CallRet {
+    log::error!("E");
     unsafe {
         let mut out_ptr_ptr: *mut u8 = core::ptr::null_mut();
         let mut out_len_ptr: usize = 0;

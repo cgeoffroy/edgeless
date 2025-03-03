@@ -29,6 +29,8 @@ pub use logging::init_logger;
 /// These functions are exported by the WASM module.
 pub mod memory;
 
+pub mod metadata;
+
 /// Provides the (reeported) functions that enable the edgeless actors to interact with the outside world.
 pub mod output_api;
 pub use output_api::*;

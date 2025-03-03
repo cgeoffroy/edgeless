@@ -1,3 +1,6 @@
+/run/current-system/sw/bin/docker
+
+
 export WASMTIME_LOG=trace
 
 export RUST_LOG=debug,h2=warn,cranelift_codegen=warn,wasmtime_cranelift=warn,tower=warn,edgeless_orc::orchestrator=info,edgeless_bal=info

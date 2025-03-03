@@ -25,3 +25,4 @@ default = ["std"]
 
 [dependencies]
 log = "0.4"
+#opentelemetry = "0.26.0"

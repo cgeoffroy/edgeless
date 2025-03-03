@@ -37,6 +37,7 @@ pub async fn cast_raw(
     payload_ptr: i32,
     payload_len: i32,
 ) -> wasmtime::Result<()> {
+    log::error!("cast_raw");
     let mem = get_memory(&mut caller)?;
     let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
     let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16_usize].to_vec();
@@ -46,6 +47,17 @@ pub async fn cast_raw(
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
     let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+
+    let u = caller.get_export("get_metadata_span_id");
+    let y = u.unwrap().into_func();
+    log::error!("Cast raw {:?}", y);
+    println!("Cast raw {:?}", y);
+    let mut x = [wasmtime::Val::I64(4)];
+    y.unwrap()
+        .call_async(&mut caller, &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    panic!("division by zero &");
 
     caller
         .data_mut()
@@ -65,6 +77,7 @@ pub async fn call_raw(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> wasmtime::Result<i32> {
+    log::error!("call_raw");
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
     let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
@@ -75,6 +88,7 @@ pub async fn call_raw(
     };
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
     let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+    panic!("division by zero 2");
 
     let call_ret = caller
         .data_mut()
@@ -106,10 +120,30 @@ pub async fn cast(
 ) -> wasmtime::Result<()> {
     let mem = get_memory(&mut caller)?; // HERE
 
+    let u = caller.get_export("get_metadata_span_id");
+    let y = u.unwrap().into_func();
+    log::error!("Cast raw {:?}", y);
+    println!("Cast raw {:?}", y);
+    let mut x = [wasmtime::Val::I64(4564)];
+    log::error!("_______________________________ {:?}", x[0]);
+
+    y.unwrap()
+        .call_async(&mut caller, &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    log::error!("_______________________________ {:?}", x[0]);
+    y.unwrap()
+        .call_async(&mut caller, &[], &mut x)
+        .await
+        .map_err(|e| wasmtime::Error::msg(format!("get_metadata {:?}", e)))?;
+    log::error!("_______________________________ {:?}", x[0]);
+
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
-    let this_metadata = edgeless_api_core::invocation::EventMetadata { root: 4242 };
+    let this_metadata = edgeless_api_core::invocation::EventMetadata {
+        root: x[0].i64().unwrap() as u64,
+    };
 
     match caller.data_mut().host.cast_alias(&target, Some(&this_metadata), &payload).await {
         Ok(_) => {}
@@ -131,6 +165,7 @@ pub async fn call(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> wasmtime::Result<i32> {
+    panic!("division by zero 4");
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
 

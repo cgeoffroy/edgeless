@@ -4,9 +4,12 @@
 // SPDX-License-Identifier: MIT
 use wasmtime::AsContextMut;
 
+use crate::base_runtime::FunctionInstanceError;
+
 /// FunctionInstance implementation allowing to execute functions defined as WASM components.
 /// Note that this only contains the WASM specific bindings, while the base_runtime provides the generic runtime functionality.
 pub struct WASMFunctionInstance {
+    set_metadata: wasmtime::TypedFunc<(u64, u64, u64, u64), ()>,
     metadata_i32_const_ptr: wasmtime::Global,
     edgeless_mem_alloc: wasmtime::TypedFunc<i32, i32>,
     edgeless_mem_free: wasmtime::TypedFunc<(i32, i32), ()>,
@@ -169,6 +172,9 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             .expect("could not set store pointer");
 
         Ok(Box::new(Self {
+            set_metadata: instance
+                .get_typed_func::<(u64, u64, u64, u64), ()>(&mut store, "set_metadata")
+                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("set_metadata not available: {}", e)))?,
             metadata_i32_const_ptr: metadata_i32_const_ptr,
             edgeless_mem_alloc: instance
                 .get_typed_func::<i32, i32>(&mut store, "edgeless_mem_alloc")
@@ -261,6 +267,15 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         msg: &str,
     ) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::info!("Cast {:?} {:?}", metadata, msg);
+
+        let _: Result<(), FunctionInstanceError> = {
+            self.set_metadata
+                .call_async(&mut self.store, (12301, 11102, 23407, 99904))
+                .await
+                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+            Ok(())
+        };
+
         // Depending on the Function, we might employ a basic arena/bump allocator that we must reset at the end of a transaction.
         // This might be a noop if the function defines a working version of `edgeless_mem_free`.
         self.edgeless_mem_clear
@@ -332,6 +347,15 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
         log::info!("Call {:?} {:?}", metadata, msg);
+
+        let _: Result<(), FunctionInstanceError> = {
+            self.set_metadata
+                .call_async(&mut self.store, (434301, 434302, metadata.unwrap().root, 434304))
+                .await
+                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+            Ok(())
+        };
+
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await

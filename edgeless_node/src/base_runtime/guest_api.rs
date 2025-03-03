@@ -31,7 +31,7 @@ impl GuestAPIHost {
         metadata: Option<&edgeless_api_core::invocation::EventMetadata>,
         msg: &str,
     ) -> Result<(), GuestAPIError> {
-        log::warn!("Cast_alias {:?} {}", metadata, msg);
+        log::warn!("Cast_alias {} {:?} {}", alias, metadata, msg);
         if alias == "self" {
             self.data_plane.send(self.instance_id, metadata, msg.to_string()).await;
             Ok(())
